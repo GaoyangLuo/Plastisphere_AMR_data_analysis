@@ -1,5 +1,3 @@
-setwd("/Users/gaoyang/Documents/COMMENbT/Rscripts/experiment/热图/热图/0306_热图_300/") 
-
 if (!requireNamespace("BiocManager", quietly = TRUE))
   install.packages("BiocManager")
 BiocManager::install("ComplexHeatmap")
@@ -30,42 +28,42 @@ library(ggsignif)
 library(ggpubr)
 
 
-# 读取ARG abundance数据
+# read ARG abundance metadata
 arg_abundance <- fread("DSR_merged_samples_with_class_fillZero_multidrgu_adjust.tsv", header = TRUE, sep = "\t")
 
-# 读取样本分组信息
+# read group metadata
 group_info <- read_excel("group_顺序.xlsx")
 
-# 使用melt函数将数据转换为长格式
+# use melt func change data to long type
 arg_abundance_long <- melt(arg_abundance, id.vars = c("ARG_name", "Class", "Database", "MGE_type"), 
                            variable.name = "Sample", value.name = "Abundance")
 
-# 合并分组信息
+# cat group
 arg_abundance_long <- arg_abundance_long %>%
   left_join(group_info, by = c("Sample" = "Sample"))
 
-# 计算每个ARG的总丰度
+# calculate ARG total abundance
 arg_total_abundance <- arg_abundance_long %>%
   group_by(ARG_name) %>%
   summarise(Total_Abundance = sum(Abundance))
 
-# 选择丰度最高的前N个ARG (例如前50个)
+# choose top 50 abundant ARG
 top_n <- 50
 top_args <- arg_total_abundance %>%
   top_n(n = top_n, wt = Total_Abundance) %>%
   pull(ARG_name)
 
-# 过滤原始数据以仅包含高丰度的ARG
+# 过滤原始数据以仅包含高丰度的ARG filter high abundant ARG
 arg_abundance_filtered <- arg_abundance_long %>%
   filter(ARG_name %in% top_args)
 
-# 计算每个ARG的相对丰度
+# 计算每个ARG的相对丰度 calculate relative ARG abundance
 arg_relative_abundance <- arg_abundance_filtered %>%
   group_by(ARG_name) %>%
   summarise(Relative_Abundance = sum(Abundance) / sum(arg_abundance_filtered$Abundance))
 
-
-# 提取分组信息并按 Class 排序
+ 
+# 提取分组信息并按 Class 排序 sort according to Class order
 row_annotation <- arg_abundance_filtered %>%
   filter(ARG_name %in% top_args) %>%
   select(ARG_name, Class, MGE_type) %>%
@@ -74,52 +72,52 @@ row_annotation <- arg_abundance_filtered %>%
   arrange(Class) %>%
   column_to_rownames(var = "ARG_name")
 
-# 按Class排序后的ARG名称顺序
+# 按Class排序后的ARG名称顺序 sorted col of ARGs names
 sorted_args <- rownames(row_annotation)
 
-# 转换为矩阵格式
+# 转换为矩阵格式 change to matrice
 arg_matrix <- arg_abundance_long %>%
   select(ARG_name, Sample, Abundance) %>%
   spread(key = Sample, value = Abundance) %>%
   column_to_rownames(var = "ARG_name")
 
-# 按丰度顺序选择前50个ARG
+# 按丰度顺序选择前50个ARG choose top 50 abundant ARGs
 arg_matrix <- arg_matrix[sorted_args, , drop = FALSE]
 
-# 确保列顺序与 group_info 中的顺序一致
+# 确保列顺序与 group_info 中的顺序一致 ensure the same sort as that in group_info
 sample_order <- group_info$Sample
 arg_matrix <- arg_matrix[, sample_order, drop = FALSE]
 
-# 计算每个样本的总抗性基因丰度
+# 计算每个样本的总抗性基因丰度 calculate total ARG abundance of each sample
 sample_total_abundance <- colSums(arg_matrix)
 
-# 将所有值转换为数值类型并处理无效值
+# 将所有值转换为数值类型并处理无效值 process NA and change all value to as.matrix
 arg_matrix <- as.matrix(arg_matrix)
-arg_matrix[is.na(arg_matrix)] <- 0       # 将NA值替换为0
-arg_matrix[is.nan(arg_matrix)] <- 0      # 将NaN值替换为0
-arg_matrix[is.infinite(arg_matrix)] <- 0 # 将Inf值替换为0
+arg_matrix[is.na(arg_matrix)] <- 0       # 将NA值替换为0 change NA to 0
+arg_matrix[is.nan(arg_matrix)] <- 0      # 将NaN值替换为0 change NaN to 0
+arg_matrix[is.infinite(arg_matrix)] <- 0 # 将Inf值替换为0 change Inf to 0
 
-# 检查是否还有无效值
+# 检查是否还有无效值 check there is invalid values
 invalid_values <- which(is.na(arg_matrix) | is.nan(arg_matrix) | is.infinite(arg_matrix), arr.ind = TRUE)
 
 if (nrow(invalid_values) > 0) {
   stop("Matrix contains invalid values at positions: ", paste(apply(invalid_values, 1, paste, collapse = ", "), collapse = "; "))
 }
 
-# 提取分组信息
+# 提取分组信息 acquire catagory information
 #row_annotation <- arg_abundance_long %>%
 #  select(ARG_name, Class, MGE_type) %>%
 #  distinct() %>%
 #  column_to_rownames(var = "ARG_name")
 
-# 提取列注释信息
+# 提取列注释信息 acquire col information
 col_annotation <- group_info %>%
   column_to_rownames(var = "Sample")
 
-# 使用RColorBrewer生成Set3调色板
+# 使用RColorBrewer生成Set3调色板 use RColorBrewer and Set3
 set3_colors <- brewer.pal(12, "Set3")
 
-# 函数：生成颜色映射，允许颜色重复
+# 函数：生成颜色映射，允许颜色重复 map color and alow repeated colour
 generate_colors <- function(categories) {
   n <- length(unique(categories))
   colors <- rep(set3_colors, length.out = n)
@@ -127,13 +125,13 @@ generate_colors <- function(categories) {
   return(colors)
 }
 
-# 创建颜色映射
+# 创建颜色映射 create mapped colour
 group_colors <- generate_colors(group_info$Group)
 class_colors <- generate_colors(row_annotation$Class)
 mge_type_colors <- generate_colors(row_annotation$MGE_type)
 
-# 创建 ComplexHeatmap 所需的注释对象
-# 创建包含条形图和分组信息的顶部分注释
+# 创建 ComplexHeatmap 所需的注释对象 create subject for annotation with ComplexHeatmap
+# 创建包含条形图和分组信息的顶部分注释 create top annotation 
 top_annotation <- HeatmapAnnotation(
   Total_Abundance = anno_barplot(sample_total_abundance,
                                  which = "column",
@@ -145,12 +143,12 @@ top_annotation <- HeatmapAnnotation(
                                               labels_gp = gpar(fontsize = 20,fontfamily = "sans")))
 )
 
-# 创建包含条形图的左侧行注释
+# 创建包含条形图的左侧行注释 create left barplot annotation
 left_barplot_annotation <- rowAnnotation(
   Relative_Abundance = anno_barplot(
     row_annotation$Relative_Abundance, 
     which = "row", 
-    gp = gpar(fill = "grey"),  # 设置柱子颜色为灰色), 
+    gp = gpar(fill = "grey"),  # 设置柱子颜色为灰色),  set color of coloum
     bar_width = 0.8, 
     border = FALSE, 
     axis_param = list(direction = "reverse"),
@@ -158,7 +156,7 @@ left_barplot_annotation <- rowAnnotation(
   )
 )
 
-# 创建包含分组信息的左侧行注释
+# 创建包含分组信息的左侧行注释 create left group annotation
 left_group_annotation <- rowAnnotation(
   MGE_type = row_annotation$MGE_type,
   Class = row_annotation$Class,
@@ -171,19 +169,19 @@ left_group_annotation <- rowAnnotation(
   )
 )
 
-# 合并左侧行注释
+# 合并左侧行注释 group left annotation and barplot
 left_annotation <- c(left_barplot_annotation, left_group_annotation)
 
 
-# 检查矩阵的数据类型和内容
+# 检查矩阵的数据类型和内容 check data type and content
 str(arg_matrix)
 head(arg_matrix)
 
-# 设置颜色渐变
-pdf("heatmap_ARG_subtype_显示丰度_multidrug_adjust.pdf", height = 40, width = 40)   #8,9
-pdf("heatmap_ARG_subtype_不显示丰度_multidrug_adjust_1.pdf", height = 40, width = 40)   #8,9
+# 设置颜色渐变 set colour
+pdf("heatmap_ARG_subtype_withAbundance_multidrug_adjust.pdf", height = 40, width = 40)   #8,9
+pdf("heatmap_ARG_subtype_withoutAbundance_multidrug_adjust_1.pdf", height = 40, width = 40)   #8,9
 color_scheme <- colorRampPalette(c("#FDEBEA", "#D5281F"))(100)
-# 绘制热图
+# 绘制热图 draw heatmap
 Heatmap(
   arg_matrix,
   name = "Abundance",
