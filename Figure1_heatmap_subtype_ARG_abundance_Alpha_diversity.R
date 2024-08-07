@@ -192,16 +192,16 @@ Heatmap(
   show_column_names = TRUE,
   row_names_gp = gpar(fontsize = 18,fontfamily = "sans"),
   column_names_gp = gpar(fontsize = 18,fontfamily = "sans"),
-  rect_gp = gpar(col = "black", lwd = 1),  # 设置格子线颜色和宽度
+  rect_gp = gpar(col = "black", lwd = 1),  # 设置格子线颜色和宽度 set colour of line and width of cell
   #cell_fun = function(j, i, x, y, width, height, fill) {
    # grid.text(sprintf("%.1e", arg_matrix[i, j]), x, y, gp = gpar(fontsize = 10, col = "black"))
   #},
-  top_annotation = top_annotation,  # 顶部分注释
-  left_annotation = left_annotation,  # 左侧行注释
+  top_annotation = top_annotation,  # 顶部分注释 top_annotation
+  left_annotation = left_annotation,  # 左侧行注释 left_annotation
   heatmap_legend_param = list(
     title = "Abundance",
-    title_gp = gpar(fontsize = 15),fontfamily = "sans",  # 设置热图图例标题的字体大小
-    legend_gp = gpar(fontsize = 20,fontfamily = "sans")  # 设置图例字体大小
+    title_gp = gpar(fontsize = 15),fontfamily = "sans",  # 设置热图图例标题的字体大小 stt title
+    legend_gp = gpar(fontsize = 20,fontfamily = "sans")  # 设置图例字体大小 set legend
   ),
   width = unit(10 * ncol(arg_matrix), "mm"),
   height = unit(8 * nrow(arg_matrix), "mm"),
@@ -212,13 +212,13 @@ Heatmap(
 
 dev.off()
 
-#默认设置，不画上左柱状图
+# save
 pdf("heatmap_ARG_subtype_test3.pdf", height = 40, width = 20)   #8,9
 pheatmap(arg_matrix,
-         # 是否聚类：
+         # 是否聚类: whether clustering
          cluster_cols = FALSE,
          cluster_rows = FALSE,
-         # 加color bar：列注释信息；
+         # 加color bar：列注释信息；add color bar: column annotation
          annotation_row = row_annotation,
          annotation_col = col_annotation,
          top_annotation = top_annotation,
@@ -249,40 +249,26 @@ pheatmap(arg_matrix,
 
 dev.off()
 
-# 绘制热图
-pheatmap(arg_matrix,
-         annotation_row = row_annotation,
-         annotation_col = col_annotation,
-         cluster_rows = TRUE,
-         cluster_cols = TRUE,
-         scale = "row",
-         show_rownames = TRUE,
-         show_colnames = TRUE,
-         fontsize_row = 6,
-         fontsize_col = 6)
-###############################计算Alpha diversity###########################
+###############################Calculate Alpha diversity###########################
 
-# 检查arg_matrix的结构
+# 检查arg_matrix的结构 check arg_matrix structure
 print(dim(arg_matrix))
 print(colnames(arg_matrix))
 
-# 转置矩阵以确保样本为行，ARG为列
+# 转置矩阵以确保样本为行，ARG为列 T -> make sure ARG as column
 arg_matrix_for_alpha_diversity <- t(arg_matrix)
 
-# 确保数据是整数
+# 确保数据是整数 make sure int
 arg_matrix_for_alpha_diversity_int <- apply(arg_matrix_for_alpha_diversity, 2, as.integer)
 
-# 计算每个样本的Shannon指数
+# 计算每个样本的Shannon指数 cal Shannon Index
 shannon_index <- diversity(arg_matrix_for_alpha_diversity, index = "shannon")
 
-# 计算每个样本的Simpson指数
+# 计算每个样本的Simpson指数 cal Simpson Index
 simpson_index <- diversity(arg_matrix_for_alpha_diversity, index = "simpson")
 
-# 计算每个样本的Chao1指数
-chao1_result <- estimateR(arg_matrix_for_alpha_diversity_int)
-chao1_index <- chao1_result["S.chao1", ]
 
-# 计算Pielou's均匀度指数
+# 计算Pielou's均匀度指数 cal Pielou's Evenness Index
 pielou_evenness <- shannon_index / log(specnumber(arg_matrix_for_alpha_diversity))
 
 # 创建一个数据框来存储结果
@@ -294,104 +280,92 @@ alpha_diversity <- data.frame(
   Pielou = pielou_evenness
 )
 
-# 合并分组信息
+# 合并分组信息 group catagory information
 alpha_diversity <- alpha_diversity %>%
   left_join(group_info, by = c("Sample" = "Sample"))
 
-# 仅保留感兴趣的组别
+# 仅保留感兴趣的组别 save group of interest
 alpha_diversity <- alpha_diversity %>%
   filter(Group %in% c("BD-MPs", "nBD-MPs"))
 
-# 输出结果
+# 输出结果 print result
 print(alpha_diversity)
 
-# 创建函数来生成带有显著性标记的箱线图
+# 创建函数来生成带有显著性标记的箱线图 create func to generate box plot with siginificance label
 create_boxplot_with_significance <- function(index, y_label) {
   groups <- unique(alpha_diversity$Group)
   comparisons <- combn(groups, 2, simplify = FALSE)
   
-  # 计算每个比较的显著性
+  # 计算每个比较的显著性 compare significance
   p_value_list <- sapply(comparisons, function(comp) {
     group_data <- alpha_diversity %>% filter(Group %in% comp)
     t.test(group_data[[index]] ~ group_data$Group)$p.value
   })
   
-  # 根据 p 值添加显著性标记
+  # 根据 p 值添加显著性标记 annote significange lable accroding to p value
   #annotations <- ifelse(p_value_list < 0.05, "*", "ns")
   
-  # 为显著的比较添加星号标记
+  # 为显著的比较添加星号标记 add *
   significance_levels <- ifelse(p_value_list < 0.001, "***",
                                 ifelse(p_value_list < 0.01, "**",
                                        ifelse(p_value_list < 0.05, "*", "ns")))
-  # 只保留显著的比较和其对应的星号标记
+  # 只保留显著的比较和其对应的星号标记 reserve group only with siginificance
   significant_comparisons <- comparisons[p_value_list < 0.05]
   significant_significance_levels <- significance_levels[p_value_list < 0.05]
   
-  # 获取每组数据的最大值，并稍微向上调整以确保空间足够放置星号
-  max_y <- max(alpha_diversity[[index]], na.rm = TRUE)
-  increment <- (max_y - min(alpha_diversity[[index]])) * 0.05
-  y_positions <- seq(max_y + increment, by = increment, length.out = length(significant_comparisons))
-  
-  # 创建箱线图并添加显著性标记
-  p <- ggplot(alpha_diversity, aes(x = Group, y = get(index), fill = Group)) +
-    geom_boxplot() +
-    ggsignif::geom_signif(comparisons = significant_comparisons, 
-                          annotations = significant_significance_levels,
-                          map_signif_level = TRUE,
-                          y_position = y_positions) +
-    theme_minimal() +
-    labs(title = paste(index, "Index by Group"), y = y_label, x = "Group") +
-    theme(legend.position = "none")
-  
-  return(p)
+  # Get the maximum value for each group and adjust upward for space to place asterisks
+max_y <- max(alpha_diversity[[index]], na.rm = TRUE)
+increment <- (max_y - min(alpha_diversity[[index]])) * 0.05
+y_positions <- seq(max_y + increment, by = increment, length.out = length(significant_comparisons))
+
+# Create boxplot and add significance markers
+p <- ggplot(alpha_diversity, aes(x = Group, y = get(index), fill = Group)) +
+  geom_boxplot() +
+  ggsignif::geom_signif(comparisons = significant_comparisons, 
+                        annotations = significant_significance_levels,
+                        map_signif_level = TRUE,
+                        y_position = y_positions) +
+  theme_minimal() +
+  labs(title = paste(index, "Index by Group"), y = y_label, x = "Group") +
+  theme(legend.position = "none")
+
+return(p)
 }
 
-# 创建各指数的箱线图
+# Create boxplots for each index
 p_shannon <- create_boxplot_with_significance("Shannon", "Shannon Index")
 p_simpson <- create_boxplot_with_significance("Simpson", "Simpson Index")
 p_chao1 <- create_boxplot_with_significance("Chao1", "Chao1 Index")
 p_pielou <- create_boxplot_with_significance("Pielou", "Pielou's Evenness")
 
-# 将多个图表合并成一个图
+# Combine multiple plots into one
 combined_plot <- ggpubr::ggarrange(p_shannon, p_simpson, p_chao1, p_pielou, 
                                    ncol = 2, nrow = 2, 
                                    common.legend = TRUE, legend = "bottom")
 
-# 打印合并后的图表
+# Print the combined plot
 print(combined_plot)
 ggsave("alpha_diversity_plots_shannon_simpson_chao1_pielou.pdf", plot = combined_plot, device = cairo_pdf, width = 10, height = 8)
 
-
-# 统计分析：比较两组的 Shannon 指数
+# Statistical analysis: Compare Shannon index between two groups
 shannon_t_test <- t.test(Shannon ~ Group, data = alpha_diversity)
 print(shannon_t_test)
 
-# 统计分析：比较两组的 Simpson 指数
+# Statistical analysis: Compare Simpson index between two groups
 simpson_t_test <- t.test(Simpson ~ Group, data = alpha_diversity)
 print(simpson_t_test)
 
-# 绘制 Shannon 指数的箱线图
+# Plot boxplot for Shannon index
 p1 <- ggplot(alpha_diversity, aes(x = Group, y = Shannon, fill = Group)) +
   geom_boxplot() +
   theme_minimal() +
   labs(title = "Shannon Index by Group", y = "Shannon Index", x = "Group")
 print(p1)
-# 保存 Shannon 指数图为 PDF
-# 保存合并后的图表为可编辑的 PDF
 
-
-  
-
-
-# 绘制Shannon和Simpson指数的箱线图
-p1 <- ggplot(alpha_diversity, aes(x = Group, y = Shannon, fill = Group)) +
-  geom_boxplot() +
-  theme_minimal() +
-  labs(title = "Shannon Index by Group", y = "Shannon Index", x = "Group")
-
-print(p1)
+# Save the Shannon index plot as a PDF
 ggsave("shannon_index.pdf", plot = p1, width = 8, height = 6)
 
+# Plot boxplot for Simpson index
 p2 <- ggplot(alpha_diversity, aes(x = Group, y = Simpson, fill = Group)) +
   geom_boxplot() +
   theme_minimal() +
@@ -399,7 +373,7 @@ p2 <- ggplot(alpha_diversity, aes(x = Group, y = Simpson, fill = Group)) +
 
 print(p2)
 
-# 绘制Chao1指数的箱线图
+# Plot boxplot for Chao1 index
 p3 <- ggplot(alpha_diversity, aes(x = Group, y = Chao1, fill = Group)) +
   geom_boxplot() +
   theme_minimal() +
@@ -407,7 +381,7 @@ p3 <- ggplot(alpha_diversity, aes(x = Group, y = Chao1, fill = Group)) +
 
 print(p3)
 
-# 绘制Pielou’s均匀度指数的箱线图
+# Plot boxplot for Pielou's Evenness index
 p4 <- ggplot(alpha_diversity, aes(x = Group, y = Pielou, fill = Group)) +
   geom_boxplot() +
   theme_minimal() +
