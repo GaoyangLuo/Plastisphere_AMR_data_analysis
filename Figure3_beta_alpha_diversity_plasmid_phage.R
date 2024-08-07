@@ -1,4 +1,3 @@
-setwd("/Users/gaoyang/Documents/COMMENbT/Rscripts/experiment/PCA图/")
 library(openxlsx)
 install.packages("svglite")
 install.packages(c("umap", "Rtsne", "cluster"))

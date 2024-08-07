@@ -1,4 +1,3 @@
-setwd("/Users/gaoyang/Documents/COMMENbT/Rscripts/experiment/散点图线性回归")
 install.packages("compositions")
 install.packages(c("coda", "MASS", "Matrix", "mvtnorm", "pracma"))
 install.packages("remotes")
